@@ -74,6 +74,8 @@ resource "aws_eks_node_group" "eks_node_group" {
   node_group_name = "eks_node_group"
   node_role_arn   = aws_iam_role.eks_iam_role_worker.arn
   subnet_ids      = aws_subnet.eks_subnet[*].id
+  instance_types = [ "t3.medium" ]
+
 
   scaling_config {
     desired_size = 1
