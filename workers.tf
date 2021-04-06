@@ -3,12 +3,15 @@ resource "aws_security_group" "workers_security_group" {
   description = "Security group for all workers in the cluster"
   vpc_id      = aws_vpc.eks_vpc.id
 
-  ingress {
-    cidr_blocks       = ["0.0.0.0/0"]
-    description       = "Allow workstation connect to nodes by SSH"
-    from_port         = 22
-    protocol          = "tcp"
-    to_port           = 22
+  dynamic ingress {
+    for_each = var.workers_security_group["ports"]
+    content {
+        cidr_blocks       = ["0.0.0.0/0"]
+        description       = "Allow outside traffic"
+        from_port         = ingress.value
+        protocol          = "tcp"
+        to_port           = ingress.value
+    }
   }
 
   egress {
@@ -66,71 +69,21 @@ resource "aws_iam_role_policy_attachment" "eks_worker_policy" {
   role       = aws_iam_role.eks_iam_role_worker.name
 }
 
-data "aws_ami" "worker_ami" {
-  filter {
-    name   = "name"
-    values = ["amazon-eks-node-${aws_eks_cluster.eks_cluster.version}-v*"]
+resource "aws_eks_node_group" "eks_node_group" {
+  cluster_name    = aws_eks_cluster.eks_cluster.name
+  node_group_name = "eks_node_group"
+  node_role_arn   = aws_iam_role.eks_iam_role_worker.arn
+  subnet_ids      = aws_subnet.eks_subnet[*].id
+
+  scaling_config {
+    desired_size = 1
+    max_size     = 1
+    min_size     = 1
   }
 
-  most_recent = true
-  owners      = ["602401143452"] # Amazon EKS AMI Account ID
-}
-
-# EKS currently documents this required userdata for EKS worker nodes to
-# properly configure Kubernetes applications on the EC2 instance.
-# We implement a Terraform local here to simplify Base64 encoding this
-# information into the AutoScaling Launch Configuration.
-# More information: https://docs.aws.amazon.com/eks/latest/userguide/launch-workers.html
-locals {
-  node_configuration = <<USERDATA
-#!/bin/bash
-set -o xtrace
-/etc/eks/bootstrap.sh --apiserver-endpoint '${aws_eks_cluster.eks_cluster.endpoint}' --b64-cluster-ca '${aws_eks_cluster.eks_cluster.certificate_authority[0].data}' '${var.cluster_name}'
-USERDATA
-}
-
-resource "aws_iam_instance_profile" "worker_instance_profile" {
-  name = "worker_instance_profile"
-  role = aws_iam_role.eks_iam_role_worker.name
-}
-
-resource "aws_key_pair" "eks_key" {
-  key_name   = "eks_key"
-  public_key = file("~/.ssh/id_rsa.pub")
-}
-
-resource "aws_launch_configuration" "workres_configuration" {
-  associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.worker_instance_profile.name
-  image_id                    = data.aws_ami.worker_ami.id
-  instance_type               = "t3.medium"
-  name_prefix                 = "worker"
-  security_groups             = [aws_security_group.workers_security_group.id]
-  user_data_base64            = base64encode(local.node_configuration)
-  key_name                    = aws_key_pair.eks_key.key_name
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_autoscaling_group" "workers_autoscaling_group" {
-  desired_capacity     = 2
-  launch_configuration = aws_launch_configuration.workres_configuration.id
-  max_size             = 2
-  min_size             = 1
-  name                 = "workres_autoscaling"
-  vpc_zone_identifier  = aws_subnet.eks_subnet.*.id
-
-  tag {
-    key                 = "Name"
-    value               = "workers_auto_scaling"
-    propagate_at_launch = true
-  }
-
-  tag {
-    key                 = "kubernetes.io/cluster/${var.cluster_name}"
-    value               = "owned"
-    propagate_at_launch = true
-  }
+  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
+  # Otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_worker_policy
+  ]
 }

@@ -47,6 +47,12 @@ variable "workers_security_group" {
 
   default = {
     name = "workers_security_group"
+    ports = [
+      22,
+      443,
+      80
+    ]
+
   }
 }
 

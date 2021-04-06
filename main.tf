@@ -15,6 +15,7 @@ resource "aws_subnet" "eks_subnet" {
   vpc_id     = aws_vpc.eks_vpc.id
   cidr_block = var.subnet[count.index]["cidr_block"]
   availability_zone = var.subnet[count.index]["availability_zone"]
+  map_public_ip_on_launch = true
 
   tags = {
     Name = var.subnet[count.index]["name"]
@@ -92,6 +93,7 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_AmazonEKSClusterPolicy" {
 resource "aws_eks_cluster" "eks_cluster" {
   name     = var.cluster_name
   role_arn = aws_iam_role.eks_cluster_iam_role.arn
+  version = "1.19"
 
   vpc_config {
     security_group_ids = [aws_security_group.eks_security_group.id]
