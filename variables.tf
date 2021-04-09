@@ -29,6 +29,11 @@ variable "subnet" {
       cidr_block = "172.16.2.0/24",
       name = "eks_subnet_b",
       availability_zone = "eu-central-1b"
+    },
+        {
+      cidr_block = "172.16.3.0/24",
+      name = "eks_subnet_c",
+      availability_zone = "eu-central-1c"
     }
   ]
 }
@@ -87,6 +92,20 @@ POLICY
   ]
 }
 POLICY
+  eks_iam_fargate_role = <<POLICY
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": "sts:AssumeRole",
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "eks-fargate-pods.amazonaws.com"
+        }
+      }
+    ]
+}
+POLICY
   } 
 }
 
@@ -98,7 +117,7 @@ variable "eks_policy_arn" {
   ]
 }
 
-variable "worker_pocly_arn" {
+variable "worker_policy_arn" {
   type = list(string)
   default = [
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
@@ -107,4 +126,10 @@ variable "worker_pocly_arn" {
   ]
 }
 
+variable "fargate_policy_arn" {
+  type = list(string)
+  default = [
+    "arn:aws:iam::aws:policy/AmazonEKSFargatePodExecutionRolePolicy"
+  ]
+}
 
