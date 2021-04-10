@@ -75,7 +75,12 @@ resource "aws_eks_node_group" "eks_node_group" {
   node_role_arn   = aws_iam_role.eks_iam_role_worker.arn
   subnet_ids      = aws_subnet.eks_subnet[*].id
   instance_types = [ "t3.medium" ]
+  capacity_type = "SPOT"
 
+  remote_access {
+
+    ec2_ssh_key = aws_key_pair.macbook_pro.key_name
+  }
 
   scaling_config {
     desired_size = 1

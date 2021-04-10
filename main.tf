@@ -10,6 +10,11 @@ resource "aws_vpc" "eks_vpc" {
   }
 }
 
+resource "aws_key_pair" "macbook_pro" {
+  key_name   = "macbook_pro"
+  public_key = file("~/.ssh/id_rsa.pub")
+}
+
 resource "aws_subnet" "eks_subnet" {
   count = length(var.subnet)
   vpc_id     = aws_vpc.eks_vpc.id
