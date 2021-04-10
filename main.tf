@@ -50,6 +50,60 @@ resource "aws_route_table_association" "route_table_association" {
   route_table_id = aws_route_table.eks_route_table.id
 }
 
+resource "aws_subnet" "private_subnet" {
+  count = length(var.private_subnet)
+  vpc_id     = aws_vpc.eks_vpc.id
+  cidr_block = var.private_subnet[count.index]["cidr_block"]
+  availability_zone = var.private_subnet[count.index]["availability_zone"]
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = var.private_subnet[count.index]["name"]
+    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+  }
+}
+
+resource "aws_eip" "nat" {
+  vpc              = true
+  count = length(var.private_subnet)
+  public_ipv4_pool = "amazon"
+}
+
+resource "aws_nat_gateway" "nat_gateway" {
+  count         = length(var.private_subnet)
+  allocation_id = element(aws_eip.nat.*.id, count.index)
+  subnet_id     = element(aws_subnet.eks_subnet.*.id, count.index)
+  depends_on    = [aws_internet_gateway.eks_gateway]
+
+  tags = {
+    Name = "eks-nat_Gateway-${count.index + 1}"
+  }
+}
+
+resource "aws_route_table" "nat-route" {
+  vpc_id = aws_vpc.eks_vpc.id
+  count  = length(var.private_subnet)
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = element(aws_nat_gateway.nat_gateway.*.id, count.index)
+  }
+  depends_on = [ aws_vpc.eks_vpc ]
+  tags  = {
+      Name = "eks-nat_route_table-${count.index + 1}"
+      state = "public"
+  } 
+}
+
+resource "aws_route_table_association" "private" {
+  count          = length(var.private_subnet)
+  subnet_id      = element(aws_subnet.private_subnet.*.id, count.index)
+  route_table_id = element(aws_route_table.nat-route.*.id, count.index)
+  depends_on = [ 
+    aws_route_table.nat-route ,
+    aws_subnet.private_subnet
+  ]
+}
+
 resource "aws_security_group" "eks_security_group" {
   name        = "eks_security_group"
   description = "Main eks security group"

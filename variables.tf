@@ -38,6 +38,27 @@ variable "subnet" {
   ]
 }
 
+variable "private_subnet" {
+  default = [
+    { 
+      cidr_block = "172.16.4.0/24",
+      name = "eks_subnet_d",
+      availability_zone = "eu-central-1a"
+    },
+
+    {
+      cidr_block = "172.16.5.0/24",
+      name = "eks_subnet_e",
+      availability_zone = "eu-central-1b"
+    },
+        {
+      cidr_block = "172.16.6.0/24",
+      name = "eks_subnet_f",
+      availability_zone = "eu-central-1c"
+    }
+  ]
+}
+
 variable "eks_security_group" {
   default = {
     cidr_block = "0.0.0.0/32"
@@ -133,3 +154,9 @@ variable "fargate_policy_arn" {
   ]
 }
 
+variable "fargate_selector" {
+  type = list(string)
+  default = [
+    "biography"
+  ]
+}
